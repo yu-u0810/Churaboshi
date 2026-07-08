@@ -1,0 +1,36 @@
+// hooks/useDistribution.ts
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { BoothId, BOOTHS } from "@/lib/constants";
+
+// hooks/useDistribution.ts の checkAndDistribute 関数内を修正
+export const useDistribution = () => {
+  const checkAndDistribute = async (studentId: string, currentBoothId: BoothId) => {
+    const studentRef = doc(db, "students", studentId);
+    const studentSnap = await getDoc(studentRef);
+
+    let updatedData: any;
+
+    if (!studentSnap.exists()) {
+      // 新規登録
+      updatedData = { createdAt: serverTimestamp() };
+      BOOTHS.forEach((b) => {
+        updatedData[b.id] = (b.id === currentBoothId);
+      });
+      await setDoc(studentRef, updatedData);
+    } else {
+      // 既存データ更新
+      const data = studentSnap.data();
+      if (data[currentBoothId] === true) {
+        return { success: false, message: "既に配布済みです", currentData: data };
+      }
+      updatedData = { ...data, [currentBoothId]: true, updatedAt: serverTimestamp() };
+      await updateDoc(studentRef, { [currentBoothId]: true, updatedAt: serverTimestamp() });
+    }
+
+    // 最新のデータを返す
+    return { success: true, message: "配布完了！", currentData: updatedData };
+  };
+
+  return { checkAndDistribute };
+};
